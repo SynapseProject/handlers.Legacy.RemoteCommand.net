@@ -10,7 +10,7 @@ using System.IO;
 
 using Alphaleonis.Win32.Filesystem;
 
-using Utilities.Encryption;
+using System.Security.Cryptography.Utility;
 
 using config = Synapse.Handlers.Legacy.RemoteCommand.Properties.Settings;
 

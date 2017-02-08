@@ -7,7 +7,7 @@ using System.Xml;
 using System.Xml.Serialization;
 using System.Collections;
 
-using Utilities.Encryption;
+using System.Security.Cryptography.Utility;
 
 using fs = Alphaleonis.Win32.Filesystem;
 

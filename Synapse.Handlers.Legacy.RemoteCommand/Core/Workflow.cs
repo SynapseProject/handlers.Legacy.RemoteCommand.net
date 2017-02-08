@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Alphaleonis.Win32.Filesystem;
-using Utilities.Encryption;
+using System.Security.Cryptography.Utility;
 
 using Synapse.Core;
 
