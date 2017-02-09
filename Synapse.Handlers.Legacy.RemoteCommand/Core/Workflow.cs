@@ -103,7 +103,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 
 		public WorkflowParameters Parameters { get { return _wfp; } set { _wfp = value as WorkflowParameters; } }
 
-		public void ExecuteAction()
+		public void ExecuteAction(bool isDryRun)
 		{
 			string context = "ExecuteAction";
 
@@ -124,7 +124,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 
                 if (isValid)
                 {
-                    RunMainWorkflow();
+                    RunMainWorkflow(isDryRun);
                 }
                 else
                 {
@@ -144,7 +144,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
             OnProgress(context, msg, ok ? StatusType.Complete : StatusType.Failed, 0, int.MaxValue, false, ex);
         }
 
-        public virtual void RunMainWorkflow()
+        public virtual void RunMainWorkflow(bool isDryRun)
         {
             OnStepProgress("RunMainWorkflow", string.Format("Unknown CommandType : {0}", _wfp.CommandType));
         }
@@ -212,7 +212,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
             return sb.ToString();
         }
 
-        public virtual void RunScript(List<RemoteCommand> commands)
+        public virtual void RunScript(List<RemoteCommand> commands, bool isDryRun)
         {
             if (_wfp.RunAs != null && _wfp.RunUsing == RunUsingProtocolType.WMI)
             {
@@ -249,7 +249,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
                 Parallel.ForEach(commands, command =>
                     {
 
-                        Int32 exitCode = WMIUtil.RunCommand(command.command + " " + command.args, command.server, _wfp.WorkingDir, timeoutValue, killProcess, actionOnTimeout, OnStepProgress, command.callbackLabel);
+                        Int32 exitCode = WMIUtil.RunCommand(command.command + " " + command.args, command.server, _wfp.WorkingDir, timeoutValue, killProcess, actionOnTimeout, OnStepProgress, command.callbackLabel, isDryRun);
 
                         if (!(IsValidExitCode(exitCode)))
                         {
@@ -263,7 +263,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
             {
                 Parallel.ForEach(commands, command =>
                     {
-                        Int32 exitCode = LocalProcessUtil.RunCommand(command.command, command.args, _wfp.WorkingDir, timeoutValue, actionOnTimeout, OnStepProgress, command.callbackLabel);
+                        Int32 exitCode = LocalProcessUtil.RunCommand(command.command, command.args, _wfp.WorkingDir, timeoutValue, actionOnTimeout, OnStepProgress, command.callbackLabel, isDryRun);
 
                         if (!(IsValidExitCode(exitCode)))
                         {

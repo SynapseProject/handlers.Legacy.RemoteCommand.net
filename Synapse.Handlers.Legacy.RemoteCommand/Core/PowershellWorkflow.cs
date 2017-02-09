@@ -22,7 +22,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
         {
         }
 
-        public override void RunMainWorkflow()
+        public override void RunMainWorkflow(bool isDryRun)
         {
             XmlNode overrideParameters = null;
             Hashtable overrideXml = new Hashtable();
@@ -131,7 +131,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
                 remoteCommands.Add(cmd);
             }
 
-            RunScript(remoteCommands);
+            RunScript(remoteCommands, isDryRun);
 
             if (!string.IsNullOrWhiteSpace(_wfp.ParameterOverrideFile) && File.Exists(_wfp.ParameterOverrideFile))
             {

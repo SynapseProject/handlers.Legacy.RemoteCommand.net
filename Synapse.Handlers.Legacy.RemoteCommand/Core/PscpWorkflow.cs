@@ -23,7 +23,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
         {
         }
 
-        public override void RunMainWorkflow()
+        public override void RunMainWorkflow(bool isDryRun)
         {
             remoteCommands = new List<RemoteCommand>();
 
@@ -80,7 +80,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
             }
 
             // Set Base Class Parameters
-            RunScript(remoteCommands);
+            RunScript(remoteCommands, isDryRun);
 
         }
     }

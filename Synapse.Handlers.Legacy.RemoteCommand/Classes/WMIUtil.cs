@@ -18,17 +18,17 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
     {
         #region Public Methods - RunCommand
 
-        public static Int32 RunCommand(String command, String server, String remoteWorkingDirectory, long timeoutMills, bool killProcessOnTimeout, TimeoutAction actionOnTimeout)
+        public static Int32 RunCommand(String command, String server, String remoteWorkingDirectory, long timeoutMills, bool killProcessOnTimeout, TimeoutAction actionOnTimeout, bool isDryRun)
         {
-            return RunCommand(command, server, remoteWorkingDirectory, null, null, null, timeoutMills, killProcessOnTimeout, actionOnTimeout, null, null);
+            return RunCommand(command, server, remoteWorkingDirectory, null, null, null, timeoutMills, killProcessOnTimeout, actionOnTimeout, null, null, isDryRun);
         }
 
-        public static Int32 RunCommand(String command, String server, String remoteWorkingDirectory, long timeoutMills, bool killProcessOnTimeout, TimeoutAction actionOnTimeout, Action<string, string> callback, string callbackLabel)
+        public static Int32 RunCommand(String command, String server, String remoteWorkingDirectory, long timeoutMills, bool killProcessOnTimeout, TimeoutAction actionOnTimeout, Action<string, string> callback, string callbackLabel, bool isDryRun)
         {
-            return RunCommand(command, server, remoteWorkingDirectory, null, null, null, timeoutMills, killProcessOnTimeout, actionOnTimeout, callback, callbackLabel);
+            return RunCommand(command, server, remoteWorkingDirectory, null, null, null, timeoutMills, killProcessOnTimeout, actionOnTimeout, callback, callbackLabel, isDryRun);
         }
 
-        public static Int32 RunCommand(String command, String server, String remoteWorkingDirectory, String runAsDomain, String runAsUser, String runAsPassword, long timeoutMills, bool killProcessOnTimeout, TimeoutAction actionOnTimeout, Action<string, string> callback, string callbackLabel)
+        public static Int32 RunCommand(String command, String server, String remoteWorkingDirectory, String runAsDomain, String runAsUser, String runAsPassword, long timeoutMills, bool killProcessOnTimeout, TimeoutAction actionOnTimeout, Action<string, string> callback, string callbackLabel, bool isDryRun)
         {
             if (config.Default.DebugMode)
                 callback(callbackLabel, "DEBUG >> Inside RunCommand");
@@ -54,170 +54,177 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
                 callback(callbackLabel, "Starting Command : " + myCmd);
             }
 
-            try
+            if (!isDryRun)
             {
-                if (config.Default.DebugMode)
-                    callback(callbackLabel, "DEBUG >> Setting / Creating Working Directory");
-
-                // Create the Remote Working Directory Using Defaults If None Is Passed In
-                if (remoteWorkingDirectory == null)
-                    Utils.CreateDirectory(rwdUnc);
-                else
-                {
-                    rwd = remoteWorkingDirectory;
-                    rwdUnc = Utils.GetServerLongPath(server, remoteWorkingDirectory);
-                    rwdWin = Utils.GetServerLongPathWindows(server, remoteWorkingDirectory);
-                }
-
-                // Create the process 
-                using (ManagementClass process = new ManagementClass("Win32_Process"))
+                try
                 {
                     if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Getting Management Scope");
+                        callback(callbackLabel, "DEBUG >> Setting / Creating Working Directory");
 
-                    ManagementScope scope = GetManagementScope(server, runAsDomain, runAsUser, runAsPassword);
-                    if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Setting Process Management Scope");
-                    
-                    process.Scope = scope;
-
-                    if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Getting Process Method Parameters");
-                    
-                    ManagementBaseObject inParams = process.GetMethodParameters("Create");
-                    
-                    if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Creating Random Logfile Name");
-                    
-                    String stdOutErrFile = System.IO.Path.GetRandomFileName();
-                    stdOutErrFile = stdOutErrFile.Replace(".", "") + ".log";
-
-                    if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Setting Process Method Parameters");
-                    
-                    inParams["CurrentDirectory"] = rwd;
-                    inParams["CommandLine"] = @"cmd.exe /c " + command + @" 1> " + stdOutErrFile + @" 2>&1";
-
-                    if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Calling InvokeMethod");
-                    
-                    ManagementBaseObject mbo = process.InvokeMethod("Create", inParams, null);
-                    
-                    if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Called InvokeMethod, Checking ReturnValue");
-
-                    UInt32 exitCode = (uint)mbo["ReturnValue"];
-                    UInt32 processId = 0;
-                    
-                    if (config.Default.DebugMode)
-                        callback(callbackLabel, "DEBUG >> Return Value = [" + exitCode + "]");
-
-
-                    if (exitCode == 0)
-                    {
-                        processId = (uint)mbo["ProcessId"];
-
-                        if (config.Default.DebugMode)
-                            callback(callbackLabel, "DEBUG >> Got ProcessId [" + processId + "]");
-
-                        String uncOutFile = rwdUnc + @"\" + stdOutErrFile;
-                        String winUncOutFile = rwdWin + @"\" + stdOutErrFile;
-                        if (server == null || "localhost".Equals(server.ToLower()) || "127.0.0.1".Equals(server.ToLower()))
-                        {
-                            uncOutFile = rwd + @"\" + stdOutErrFile;
-                            winUncOutFile = rwd + @"\" + stdOutErrFile;
-                        }
-
-                        // Start Tailing Output Log
-                        if (config.Default.DebugMode)
-                            callback(callbackLabel, "DEBUG >> Starting LogTrailer On File [" + winUncOutFile + "]");
-                        LogTailer tailer = new LogTailer(winUncOutFile, callback, callbackLabel);
-                        tailer.Start();
-
-                        // Wait For Process To Finish or Timeout To Be Reached
-                        ManagementEventWatcher w = new ManagementEventWatcher(scope, new WqlEventQuery("select * from Win32_ProcessStopTrace where ProcessId=" + processId));
-                        if (timeoutMills > 0)
-                            w.Options.Timeout = new TimeSpan(0, 0, 0, 0, (int)timeoutMills);
-                        try
-                        {
-                            ManagementBaseObject mboEvent = w.WaitForNextEvent();
-                            UInt32 uExitStatus = (UInt32)mboEvent.Properties["ExitStatus"].Value;
-                            exitStatus = unchecked((int)uExitStatus);
-                        } 
-                        catch (ManagementException ex)
-                        {
-                            if (ex.Message.Contains("Timed out"))
-                            {
-                                StringBuilder rc = new StringBuilder();
-                                String processName = @"cmd.exe";
-                                String timeoutMessage = "TIMEOUT : Process [" + processName + "] With Id [" + processId + "] Failed To Stop In [" + timeoutMills + "] Milliseconds.";
-                                if (killProcessOnTimeout)
-                                {
-                                    String queryStr = String.Format("SELECT * FROM Win32_Process Where Name = '{0}' AND ProcessId = '{1}'", processName, processId);
-                                    ObjectQuery Query = new ObjectQuery(queryStr);
-                                    ManagementObjectSearcher Searcher = new ManagementObjectSearcher(scope, Query);
-
-                                    foreach (ManagementObject thisProcess in Searcher.Get())
-                                        rc.Append(KillProcess(scope, thisProcess));
-
-                                    using (StringReader procStr = new StringReader(rc.ToString()))
-                                    {
-                                        String procLine;
-                                        while ((procLine = procStr.ReadLine()) != null)
-                                        {
-                                            if (callback != null)
-                                                callback(callbackLabel, procLine);
-                                            else
-                                                Console.WriteLine(procLine);
-                                        }
-                                    }
-
-                                    timeoutMessage = "TIMEOUT : Process [" + processName + "] With Id [" + processId + "] Failed To Stop In [" + timeoutMills + "] Milliseconds And Was Remotely Termintated.";
-                                }
-                                tailer.Stop(60, true);
-                                throw new Exception(timeoutMessage);
-                            }
-                            else
-                            {
-                                tailer.Stop(60, true);
-                                throw ex;
-                            }
-                        }
-
-                        // Process Completed.  Give up to 10 minutes for remote execution logs to be processed.
-                        tailer.Stop(600, true);
-                    }
+                    // Create the Remote Working Directory Using Defaults If None Is Passed In
+                    if (remoteWorkingDirectory == null)
+                        Utils.CreateDirectory(rwdUnc);
                     else
                     {
-                        if (callback != null)
+                        rwd = remoteWorkingDirectory;
+                        rwdUnc = Utils.GetServerLongPath(server, remoteWorkingDirectory);
+                        rwdWin = Utils.GetServerLongPathWindows(server, remoteWorkingDirectory);
+                    }
+
+                    // Create the process 
+                    using (ManagementClass process = new ManagementClass("Win32_Process"))
+                    {
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Getting Management Scope");
+
+                        ManagementScope scope = GetManagementScope(server, runAsDomain, runAsUser, runAsPassword);
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Setting Process Management Scope");
+
+                        process.Scope = scope;
+
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Getting Process Method Parameters");
+
+                        ManagementBaseObject inParams = process.GetMethodParameters("Create");
+
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Creating Random Logfile Name");
+
+                        String stdOutErrFile = System.IO.Path.GetRandomFileName();
+                        stdOutErrFile = stdOutErrFile.Replace(".", "") + ".log";
+
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Setting Process Method Parameters");
+
+                        inParams["CurrentDirectory"] = rwd;
+                        inParams["CommandLine"] = @"cmd.exe /c " + command + @" 1> " + stdOutErrFile + @" 2>&1";
+
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Calling InvokeMethod");
+
+                        ManagementBaseObject mbo = process.InvokeMethod("Create", inParams, null);
+
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Called InvokeMethod, Checking ReturnValue");
+
+                        UInt32 exitCode = (uint)mbo["ReturnValue"];
+                        UInt32 processId = 0;
+
+                        if (config.Default.DebugMode)
+                            callback(callbackLabel, "DEBUG >> Return Value = [" + exitCode + "]");
+
+
+                        if (exitCode == 0)
                         {
-                            callback(callbackLabel, "Return Value : " + exitCode);
-                            callback(callbackLabel, mbo.GetText(TextFormat.Mof));
+                            processId = (uint)mbo["ProcessId"];
+
+                            if (config.Default.DebugMode)
+                                callback(callbackLabel, "DEBUG >> Got ProcessId [" + processId + "]");
+
+                            String uncOutFile = rwdUnc + @"\" + stdOutErrFile;
+                            String winUncOutFile = rwdWin + @"\" + stdOutErrFile;
+                            if (server == null || "localhost".Equals(server.ToLower()) || "127.0.0.1".Equals(server.ToLower()))
+                            {
+                                uncOutFile = rwd + @"\" + stdOutErrFile;
+                                winUncOutFile = rwd + @"\" + stdOutErrFile;
+                            }
+
+                            // Start Tailing Output Log
+                            if (config.Default.DebugMode)
+                                callback(callbackLabel, "DEBUG >> Starting LogTrailer On File [" + winUncOutFile + "]");
+                            LogTailer tailer = new LogTailer(winUncOutFile, callback, callbackLabel);
+                            tailer.Start();
+
+                            // Wait For Process To Finish or Timeout To Be Reached
+                            ManagementEventWatcher w = new ManagementEventWatcher(scope, new WqlEventQuery("select * from Win32_ProcessStopTrace where ProcessId=" + processId));
+                            if (timeoutMills > 0)
+                                w.Options.Timeout = new TimeSpan(0, 0, 0, 0, (int)timeoutMills);
+                            try
+                            {
+                                ManagementBaseObject mboEvent = w.WaitForNextEvent();
+                                UInt32 uExitStatus = (UInt32)mboEvent.Properties["ExitStatus"].Value;
+                                exitStatus = unchecked((int)uExitStatus);
+                            }
+                            catch (ManagementException ex)
+                            {
+                                if (ex.Message.Contains("Timed out"))
+                                {
+                                    StringBuilder rc = new StringBuilder();
+                                    String processName = @"cmd.exe";
+                                    String timeoutMessage = "TIMEOUT : Process [" + processName + "] With Id [" + processId + "] Failed To Stop In [" + timeoutMills + "] Milliseconds.";
+                                    if (killProcessOnTimeout)
+                                    {
+                                        String queryStr = String.Format("SELECT * FROM Win32_Process Where Name = '{0}' AND ProcessId = '{1}'", processName, processId);
+                                        ObjectQuery Query = new ObjectQuery(queryStr);
+                                        ManagementObjectSearcher Searcher = new ManagementObjectSearcher(scope, Query);
+
+                                        foreach (ManagementObject thisProcess in Searcher.Get())
+                                            rc.Append(KillProcess(scope, thisProcess));
+
+                                        using (StringReader procStr = new StringReader(rc.ToString()))
+                                        {
+                                            String procLine;
+                                            while ((procLine = procStr.ReadLine()) != null)
+                                            {
+                                                if (callback != null)
+                                                    callback(callbackLabel, procLine);
+                                                else
+                                                    Console.WriteLine(procLine);
+                                            }
+                                        }
+
+                                        timeoutMessage = "TIMEOUT : Process [" + processName + "] With Id [" + processId + "] Failed To Stop In [" + timeoutMills + "] Milliseconds And Was Remotely Termintated.";
+                                    }
+                                    tailer.Stop(60, true);
+                                    throw new Exception(timeoutMessage);
+                                }
+                                else
+                                {
+                                    tailer.Stop(60, true);
+                                    throw ex;
+                                }
+                            }
+
+                            // Process Completed.  Give up to 10 minutes for remote execution logs to be processed.
+                            tailer.Stop(600, true);
+                        }
+                        else
+                        {
+                            if (callback != null)
+                            {
+                                callback(callbackLabel, "Return Value : " + exitCode);
+                                callback(callbackLabel, mbo.GetText(TextFormat.Mof));
+                            }
                         }
                     }
+                }
+                catch (Exception e)
+                {
+                    if (callback != null)
+                    {
+                        String errorMsg = e.Message;
+
+                        if (errorMsg.StartsWith("TIMEOUT"))
+                        {
+                            callback(callbackLabel, e.Message);
+                        }
+                        else
+                        {
+                            callback(callbackLabel, "Error Occured In WMIUtils.RunCommand : ");
+                            callback(callbackLabel, e.Message);
+                            callback(callbackLabel, e.StackTrace);
+                            throw e;
+                        }
+                    }
+
+                    if (actionOnTimeout == TimeoutAction.Error)
+                        throw e;
                 }
             }
-            catch (Exception e)
+            else
             {
-                if (callback != null)
-                {
-                    String errorMsg = e.Message;
-
-                    if (errorMsg.StartsWith("TIMEOUT"))
-                    {
-                        callback(callbackLabel, e.Message);
-                    }
-                    else
-                    {
-                        callback(callbackLabel, "Error Occured In WMIUtils.RunCommand : ");
-                        callback(callbackLabel, e.Message);
-                        callback(callbackLabel, e.StackTrace);
-                        throw e;
-                    }
-                }
-
-                if (actionOnTimeout == TimeoutAction.Error)
-                    throw e;
+                callback?.Invoke(callbackLabel, "Dry Run Flag Set.  Execution Skipped");
             }
 
             if (callback != null)

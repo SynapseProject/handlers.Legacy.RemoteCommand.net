@@ -6,8 +6,10 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 {
     class LocalProcessUtil
     {
-        public static Int32 RunCommand(String command, String args, String remoteWorkingDirectory, long timeoutMills, TimeoutAction actionOnTimeout, Action<string, string> callback, String callbackLabel)
+        public static Int32 RunCommand(String command, String args, String remoteWorkingDirectory, long timeoutMills, TimeoutAction actionOnTimeout, Action<string, string> callback, String callbackLabel, bool isDryRun)
         {
+            Int32 exitCode = 0;
+
             Process process = new Process();
             process.StartInfo.FileName = command;
             process.StartInfo.Arguments = args;
@@ -21,66 +23,75 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
             if (callback != null)
                 callback(callbackLabel, "Starting Command : " + command + " " + args);
 
-            process.Start();
-
-
-            Thread stdOutReader = new Thread(delegate ()
+            if (!isDryRun)
             {
-                while (!process.StandardOutput.EndOfStream)
-                {
-                    String line = process.StandardOutput.ReadLine();
-                    callback(callbackLabel, line);
-                }
-            });
-            stdOutReader.Start();
-
-            Thread stdErrReader = new Thread(delegate ()
-            {
-                while (!process.StandardError.EndOfStream)
-                {
-                    String line = process.StandardError.ReadLine();
-                    callback(callbackLabel, line);
-                }
-            });
-            stdErrReader.Start();
+                process.Start();
 
 
-            bool timeoutReached = false;
-            Stopwatch timer = new Stopwatch();
-            timer.Start();
-            while (stdOutReader.IsAlive && stdErrReader.IsAlive && !(timeoutReached))
-            {
-                if (timeoutMills > 0)
+                Thread stdOutReader = new Thread(delegate ()
                 {
-                    if (timer.ElapsedMilliseconds > timeoutMills)
-                        timeoutReached = true;
+                    while (!process.StandardOutput.EndOfStream)
+                    {
+                        String line = process.StandardOutput.ReadLine();
+                        callback(callbackLabel, line);
+                    }
+                });
+                stdOutReader.Start();
+
+                Thread stdErrReader = new Thread(delegate ()
+                {
+                    while (!process.StandardError.EndOfStream)
+                    {
+                        String line = process.StandardError.ReadLine();
+                        callback(callbackLabel, line);
+                    }
+                });
+                stdErrReader.Start();
+
+
+                bool timeoutReached = false;
+                Stopwatch timer = new Stopwatch();
+                timer.Start();
+                while (stdOutReader.IsAlive && stdErrReader.IsAlive && !(timeoutReached))
+                {
+                    if (timeoutMills > 0)
+                    {
+                        if (timer.ElapsedMilliseconds > timeoutMills)
+                            timeoutReached = true;
+                    }
+                    Thread.Sleep(500);
                 }
-                Thread.Sleep(500);
+                timer.Stop();
+
+                if (timeoutReached)
+                {
+                    String timeoutMessage = "TIMEOUT : Process [" + process.ProcessName + "] With Id [" + process.Id + "] Failed To Stop In [" + timeoutMills + "] Milliseconds And Was Remotely Termintated.";
+
+                    if (!process.HasExited)
+                    {
+                        process.Kill();
+                        callback(callbackLabel, timeoutMessage);
+                    }
+                    else
+                    {
+                        timeoutMessage = "TIMEOUT : Process [" + process.ProcessName + "] With Id [" + process.Id + "] Failed To Stop In [" + timeoutMills + "] Milliseconds But May Have Completed.";
+                        callback(callbackLabel, timeoutMessage);
+                    }
+                    if (actionOnTimeout == TimeoutAction.Error)
+                        throw new Exception(timeoutMessage);
+                }
+
+                exitCode = process.ExitCode;
             }
-            timer.Stop();
-
-            if (timeoutReached)
+            else
             {
-                String timeoutMessage = "TIMEOUT : Process [" + process.ProcessName + "] With Id [" + process.Id + "] Failed To Stop In [" + timeoutMills + "] Milliseconds And Was Remotely Termintated.";
-
-                if (!process.HasExited)
-                {
-                    process.Kill();
-                    callback(callbackLabel, timeoutMessage);
-                }
-                else
-                {
-                    timeoutMessage = "TIMEOUT : Process [" + process.ProcessName + "] With Id [" + process.Id + "] Failed To Stop In [" + timeoutMills + "] Milliseconds But May Have Completed.";
-                    callback(callbackLabel, timeoutMessage);
-                }
-                if (actionOnTimeout == TimeoutAction.Error)
-                    throw new Exception(timeoutMessage);
+                callback?.Invoke(callbackLabel, "Dry Run Flag Set.  Execution Skipped");
             }
 
             if (callback != null)
-                callback(callbackLabel, "Command Completed.  Exit Code = " + process.ExitCode);
+                callback(callbackLabel, "Command Completed.  Exit Code = " + exitCode);
 
-            return process.ExitCode;
+            return exitCode;
         }
 
     }
