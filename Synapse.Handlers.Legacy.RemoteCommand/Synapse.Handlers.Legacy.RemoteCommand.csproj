@@ -71,7 +71,7 @@
     <Compile Include="Core\PlinkWorkflow.cs" />
     <Compile Include="Core\PowershellWorkflow.cs" />
     <Compile Include="Core\PscpWorkflow.cs" />
-    <Compile Include="Core\RemoteCommandHandler.cs" />
+    <Compile Include="RemoteCommandHandler.cs" />
     <Compile Include="Core\Workflow.cs" />
     <Compile Include="Core\WorkflowParameters.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

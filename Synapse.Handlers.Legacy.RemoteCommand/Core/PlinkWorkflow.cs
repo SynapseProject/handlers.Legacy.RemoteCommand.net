@@ -22,7 +22,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
         {
         }
 
-        public override void RunMainWorkflow()
+        public override void RunMainWorkflow(bool isDryRun)
         {
             remoteCommands = new List<RemoteCommand>();
             if (!string.IsNullOrWhiteSpace(_wfp.ParameterOverrideFile) && File.Exists(_wfp.ParameterOverrideFile))
@@ -45,7 +45,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
                 BuildPlinkCommands();
 
             // Set Base Class Parameters
-            RunScript(remoteCommands);
+            RunScript(remoteCommands, isDryRun);
 
             if (!string.IsNullOrWhiteSpace(_wfp.ParameterOverrideFile) && File.Exists(_wfp.ParameterOverrideFile))
                 File.Delete(_wfp.ParameterOverrideFile);
