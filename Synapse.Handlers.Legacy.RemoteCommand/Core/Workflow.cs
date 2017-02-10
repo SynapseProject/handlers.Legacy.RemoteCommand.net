@@ -21,11 +21,6 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 		protected WorkflowParameters _wfp = null;
         protected List<RemoteCommand> remoteCommands = new List<RemoteCommand>();
 
-        //TODO : Make Function Pointers
-
-//        public void OnLogMessage(string context, string message, LogLevel level = LogLevel.Info, Exception ex = null);
-//        public bool OnProgress(string context, string message, StatusType status = StatusType.Running, long id = 0, int sequence = 0, bool cancel = false, Exception ex = null);
-
         public Action<string, string, LogLevel, Exception> OnLogMessage;
         public Func<string, string, StatusType, long, int, bool, Exception, bool> OnProgress;
 
