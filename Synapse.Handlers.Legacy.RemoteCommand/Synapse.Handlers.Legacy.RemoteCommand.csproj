@@ -60,11 +60,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Classes\AdapterProgressEventArgs.cs" />
     <Compile Include="Classes\Enums.cs" />
     <Compile Include="Classes\LocalProcessUtil.cs" />
     <Compile Include="Classes\LogTailer.cs" />
-    <Compile Include="Classes\PackageStatus.cs" />
     <Compile Include="Classes\WMIUtil.cs" />
     <Compile Include="Classes\Utils.cs" />
     <Compile Include="Core\AntWorkflow.cs" />

@@ -28,30 +28,10 @@ public class RemoteCommandHandler : HandlerRuntimeBase
         wf.OnLogMessage = this.OnLogMessage;
         wf.OnProgress = this.OnProgress;
 
-//        wf.StepStarting += wf_StepStarting;
-//        wf.StepProgress += wf_StepProgress;
-//        wf.StepFinished += wf_StepFinished;
-
         seqNo = 0;
         OnProgress("Execute", "Starting", StatusType.Running, startInfo.InstanceId, seqNo++);
         wf.ExecuteAction(startInfo.IsDryRun);
 
         return new ExecuteResult() { Status = StatusType.Complete };
     }
-
-    void wf_StepStarting(object sender, AdapterProgressEventArgs e)
-    {
-        OnLogMessage(e.Context, e.Message);
-    }
-
-    void wf_StepProgress(object sender, AdapterProgressEventArgs e)
-    {
-        OnLogMessage(e.Context, e.Message);
-    }
-
-    void wf_StepFinished(object sender, AdapterProgressEventArgs e)
-    {
-        OnLogMessage(e.Context, e.Message);
-    }
-
 }
