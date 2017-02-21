@@ -29,7 +29,7 @@ public class RemoteCommandHandler : HandlerRuntimeBase
 
         seqNo = 0;
         OnProgress("Execute", "Starting", StatusType.Running, startInfo.InstanceId, seqNo++);
-        wf.ExecuteAction(startInfo.IsDryRun);
+        wf.ExecuteAction(startInfo);
 
         return new ExecuteResult() { Status = StatusType.Complete };
     }
