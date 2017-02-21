@@ -21,7 +21,6 @@ public class RemoteCommandHandler : HandlerRuntimeBase
         WorkflowParameters wfp = new WorkflowParameters();
         TextReader reader = new StringReader(startInfo.Parameters);
         wfp = (WorkflowParameters)ser.Deserialize(reader);
-        Console.WriteLine(wfp.ToString());
 
         Workflow wf = Workflow.GetInstance(wfp);
 
