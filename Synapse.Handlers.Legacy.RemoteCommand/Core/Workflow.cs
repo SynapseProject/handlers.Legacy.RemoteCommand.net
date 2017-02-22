@@ -19,6 +19,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 	public class Workflow
 	{
 		protected WorkflowParameters _wfp = null;
+        protected HandlerStartInfo _startInfo = null;
         protected List<RemoteCommand> remoteCommands = new List<RemoteCommand>();
 
         public Action<string, string, LogLevel, Exception> OnLogMessage;
@@ -101,6 +102,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 		public void ExecuteAction(HandlerStartInfo startInfo)
 		{
 			string context = "ExecuteAction";
+            _startInfo = startInfo;
 
 			string msg = Utils.GetHeaderMessage( string.Format( "Entering Main Workflow.") );
 			if( OnStepStarting( context, msg ) )
@@ -136,7 +138,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
             msg = Utils.GetHeaderMessage(string.Format("End Main Workflow: {0}, Total Execution Time: {1}",
                 ok ? "Complete." : "One or more steps failed.", clock.ElapsedSeconds()));
 //            OnStepFinished(context, msg, ok ? PackageStatus.Complete : PackageStatus.Failed, int.MaxValue, 0, ex);
-            OnProgress(context, msg, ok ? StatusType.Complete : StatusType.Failed, 0, int.MaxValue, false, ex);
+            OnProgress(context, msg, ok ? StatusType.Complete : StatusType.Failed, _startInfo.InstanceId, int.MaxValue, false, ex);
         }
 
         public virtual void RunMainWorkflow(bool isDryRun)
@@ -378,7 +380,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 		/// <returns>AdapterProgressCancelEventArgs.Cancel value.</returns>
 		bool OnStepStarting(string context, string message)
 		{
-            OnProgress(context, message, StatusType.Running, 0, _cheapSequence++, false, null);
+            OnProgress(context, message, StatusType.Running, _startInfo.InstanceId, _cheapSequence++, false, null);
 			return false;
 		}
 
@@ -390,7 +392,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 		/// <param name="message">Descriptive message.</param>
 		protected void OnStepProgress(string context, string message)
 		{
-            OnProgress(context, message, StatusType.Running, 0, _cheapSequence++, false, null);
+            OnProgress(context, message, StatusType.Running, _startInfo.InstanceId, _cheapSequence++, false, null);
 		}
 
 		/// <summary>
@@ -401,7 +403,7 @@ namespace Synapse.Handlers.Legacy.RemoteCommand
 		/// <param name="message">Descriptive message.</param>
 		protected void OnStepFinished(string context, string message)
 		{
-            OnProgress(context, message, StatusType.Running, 0, _cheapSequence++, false, null);
+            OnProgress(context, message, StatusType.Running, _startInfo.InstanceId, _cheapSequence++, false, null);
         }
         #endregion
 
